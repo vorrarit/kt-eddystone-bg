@@ -8,6 +8,7 @@ import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.messages.Message
 import com.google.android.gms.nearby.messages.MessageListener
 import com.google.firebase.firestore.FirebaseFirestore
+import java.util.*
 
 
 class BeaconMessageReceiver : BroadcastReceiver() {
@@ -22,7 +23,7 @@ class BeaconMessageReceiver : BroadcastReceiver() {
             override fun onFound(message: Message) {
                 Log.i(TAG, "Found message via PendingIntent: $message")
                 db.collection("scan-logs")
-                        .add(mapOf( "event" to "found", "message" to message, "content" to message.content, "namespace" to message.namespace, "type" to message.type ))
+                        .add(mapOf( "timestamp" to Date(), "event" to "found", "content" to String(message.content), "namespace" to message.namespace, "type" to message.type ))
                         .addOnSuccessListener { documentReference -> Log.d(TAG, "document added with id ${documentReference.id}") }
                         .addOnFailureListener { e -> Log.w(TAG, "error adding document", e) }
 
@@ -31,7 +32,7 @@ class BeaconMessageReceiver : BroadcastReceiver() {
             override fun onLost(message: Message) {
                 Log.i(TAG, "Lost message via PendingIntent: $message")
                 db.collection("scan-logs")
-                        .add(mapOf( "event" to "lost", "message" to message, "content" to message.content, "namespace" to message.namespace, "type" to message.type ))
+                        .add(mapOf( "timestamp" to Date(), "event" to "lost", "content" to String(message.content), "namespace" to message.namespace, "type" to message.type ))
                         .addOnSuccessListener { documentReference -> Log.d(TAG, "document added with id ${documentReference.id}") }
                         .addOnFailureListener { e -> Log.w(TAG, "error adding document", e) }
             }

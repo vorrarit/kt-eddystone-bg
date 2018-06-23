@@ -1,5 +1,6 @@
 package th.co.bitfactory.kteddystonebg
 
+import android.Manifest
 import android.os.Bundle
 import android.support.design.widget.Snackbar
 import android.support.v7.app.AppCompatActivity
@@ -16,6 +17,13 @@ import com.google.android.gms.nearby.messages.MessageListener
 import com.google.android.gms.nearby.messages.Strategy
 import com.google.android.gms.nearby.messages.SubscribeOptions
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.android.gms.nearby.messages.NearbyPermissions
+import com.google.android.gms.nearby.messages.MessagesOptions
+import android.content.pm.PackageManager
+import android.Manifest.permission
+import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.support.v4.content.ContextCompat
+import java.util.*
 
 
 class MainActivity : AppCompatActivity() {
@@ -24,18 +32,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val db = FirebaseFirestore.getInstance()
+    private var mMessageListener: MessageListener? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
 
+        mMessageListener = object:MessageListener() {
+            override fun onFound(message: Message) {
+                Log.i(TAG, "Found message via PendingIntent: $message")
+                db.collection("scan-logs")
+                        .add(mapOf( "timestamp" to Date(), "event" to "found", "content" to message.content, "namespace" to message.namespace, "type" to message.type ))
+                        .addOnSuccessListener { documentReference -> Log.d(BeaconMessageReceiver.TAG, "document added with id ${documentReference.id}") }
+                        .addOnFailureListener { e -> Log.w(BeaconMessageReceiver.TAG, "error adding document", e) }
+
+            }
+
+            override fun onLost(message: Message) {
+                Log.i(TAG, "Lost message via PendingIntent: $message")
+                db.collection("scan-logs")
+                        .add(mapOf( "timestamp" to Date(), "event" to "lost", "content" to message.content, "namespace" to message.namespace, "type" to message.type ))
+                        .addOnSuccessListener { documentReference -> Log.d(BeaconMessageReceiver.TAG, "document added with id ${documentReference.id}") }
+                        .addOnFailureListener { e -> Log.w(BeaconMessageReceiver.TAG, "error adding document", e) }
+            }
+        }
+
         fab.setOnClickListener { view ->
             Snackbar.make(view, "Start Background Subscribe", Snackbar.LENGTH_LONG)
                     .setAction("Action", null).show()
 
-            foregroundSubscribe()
-//            backgroundSubscribe()
+//            foregroundSubscribe()
+            backgroundSubscribe()
         }
     }
 
@@ -56,28 +84,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun foregroundSubscribe() {
-        Log.i(TAG, "Subscribing for foreground updates.")
-        val options = SubscribeOptions.Builder()
-                .setStrategy(Strategy.BLE_ONLY)
-                .build()
-        Nearby.getMessagesClient(this).subscribe(object:MessageListener() {
-            override fun onFound(message: Message) {
-                Log.i(TAG, "Found message via PendingIntent: $message")
-                db.collection("scan-logs")
-                        .add(mapOf( "event" to "found", "message" to message, "content" to message.content, "namespace" to message.namespace, "type" to message.type ))
-                        .addOnSuccessListener { documentReference -> Log.d(BeaconMessageReceiver.TAG, "document added with id ${documentReference.id}") }
-                        .addOnFailureListener { e -> Log.w(BeaconMessageReceiver.TAG, "error adding document", e) }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+//            val mMessagesClient = Nearby.getMessagesClient(this, MessagesOptions.Builder()
+//                    .setPermissions(NearbyPermissions.BLE)
+//                    .build())
 
+            Log.i(TAG, "Subscribing for foreground updates.")
+            val options = SubscribeOptions.Builder()
+                    .setStrategy(Strategy.BLE_ONLY)
+                    .build()
+            mMessageListener?.let {
+                Nearby.getMessagesClient(this).subscribe(it, options)
             }
-
-            override fun onLost(message: Message) {
-                Log.i(TAG, "Lost message via PendingIntent: $message")
-                db.collection("scan-logs")
-                        .add(mapOf( "event" to "lost", "message" to message, "content" to message.content, "namespace" to message.namespace, "type" to message.type ))
-                        .addOnSuccessListener { documentReference -> Log.d(BeaconMessageReceiver.TAG, "document added with id ${documentReference.id}") }
-                        .addOnFailureListener { e -> Log.w(BeaconMessageReceiver.TAG, "error adding document", e) }
-            }
-        }, options)
+        }
     }
 
     // Subscribe to messages in the background.
