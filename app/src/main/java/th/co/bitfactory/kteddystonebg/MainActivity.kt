@@ -22,6 +22,8 @@ import com.google.android.gms.nearby.messages.MessagesOptions
 import android.content.pm.PackageManager
 import android.Manifest.permission
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.app.AlarmManager
+import android.content.Context
 import android.support.v4.content.ContextCompat
 import java.util.*
 
@@ -102,10 +104,22 @@ class MainActivity : AppCompatActivity() {
     // Subscribe to messages in the background.
     private fun backgroundSubscribe() {
         Log.i(TAG, "Subscribing for background updates.")
-        val options = SubscribeOptions.Builder()
-                .setStrategy(Strategy.BLE_ONLY)
-                .build()
-        Nearby.getMessagesClient(this).subscribe(getPendingIntent(), options)
+
+//        startService(Intent(this, BeaconSubscriberService::class.java))
+
+        val alarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pendingIntent = PendingIntent.getService(
+                applicationContext,
+                0,
+                Intent(this, BeaconSubscriberService::class.java),
+                PendingIntent.FLAG_CANCEL_CURRENT
+        )
+        alarmManager.setRepeating(
+                AlarmManager.RTC_WAKEUP,
+                Calendar.getInstance().timeInMillis,
+                1000 * 60 * 5,
+                pendingIntent
+        )
     }
 
     private fun getPendingIntent(): PendingIntent {
